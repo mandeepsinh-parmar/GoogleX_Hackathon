@@ -1,0 +1,70 @@
+# ==========================
+# Environment & Secrets
+# ==========================
+.env
+*.env
+.env.*
+!.env.example
+
+# ==========================
+# Python
+# ==========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+wheels/
+.installed.cfg
+lib/
+lib64/
+
+# ==========================
+# Virtual Environments
+# ==========================
+.venv/
+venv/
+ENV/
+env/
+.python-version
+
+# ==========================
+# IDEs & Editors
+# ==========================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ==========================
+# Logs & Debug
+# ==========================
+*.log
+flask_session/
+instance/
+
+# ==========================
+# Testing & Coverage
+# ==========================
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ==========================
+# OS Files
+# ==========================
+.DS_Store
+Desktop.ini
