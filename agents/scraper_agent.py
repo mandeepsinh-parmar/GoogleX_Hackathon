@@ -28,87 +28,174 @@ client = genai.Client(api_key=GOOGLE_API_KEY)
 _GEMINI_MODEL = "gemini-1.5-flash"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Geocoding
+# Geocoding — Precise Google Maps workflow
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Minimum acceptable location types (reject anything less precise)
+_ACCEPTABLE_LOCATION_TYPES = {"ROOFTOP", "RANGE_INTERPOLATED", "GEOMETRIC_CENTER"}
+
+
+def _find_place_from_text(query: str) -> Optional[Dict]:
+    """Step 1: Use Find Place From Text API to get the best place_id."""
+    if not GOOGLE_MAPS_API_KEY:
+        return None
+    try:
+        resp = requests.get(
+            "https://maps.googleapis.com/maps/api/place/findplacefromtext/json",
+            params={
+                "input": query,
+                "inputtype": "textquery",
+                "fields": "place_id,name,formatted_address,geometry",
+                "locationbias": "ipbias",
+                "key": GOOGLE_MAPS_API_KEY,
+            },
+            timeout=10,
+        )
+        data = resp.json()
+        status = data.get("status", "")
+        if status in ("OVER_QUERY_LIMIT", "REQUEST_DENIED"):
+            print(f"[Geocode] Find Place API error: {status} — {data.get('error_message', '')}")
+            return None
+        if status == "OK" and data.get("candidates"):
+            # Return the highest-confidence result (first candidate)
+            return data["candidates"][0]
+    except Exception as e:
+        print(f"[Geocode] Find Place exception: {e}")
+    return None
+
+
+def _get_place_details(place_id: str) -> Optional[Dict]:
+    """Step 2: Use Place Details API for precise coordinates from a place_id."""
+    if not GOOGLE_MAPS_API_KEY or not place_id:
+        return None
+    try:
+        resp = requests.get(
+            "https://maps.googleapis.com/maps/api/place/details/json",
+            params={
+                "place_id": place_id,
+                "fields": "geometry,formatted_address,name,place_id",
+                "key": GOOGLE_MAPS_API_KEY,
+            },
+            timeout=10,
+        )
+        data = resp.json()
+        status = data.get("status", "")
+        if status in ("OVER_QUERY_LIMIT", "REQUEST_DENIED"):
+            print(f"[Geocode] Place Details API error: {status} — {data.get('error_message', '')}")
+            return None
+        if status == "OK" and data.get("result"):
+            result = data["result"]
+            geo = result.get("geometry", {}).get("location", {})
+            return {
+                "lat": geo.get("lat"),
+                "lng": geo.get("lng"),
+                "formatted_address": result.get("formatted_address", ""),
+                "place_id": result.get("place_id", place_id),
+                "location_type": result.get("geometry", {}).get("location_type", "ROOFTOP"),
+            }
+    except Exception as e:
+        print(f"[Geocode] Place Details exception: {e}")
+    return None
+
+
+def _geocode_with_address(address: str, state: str = "") -> Optional[Dict]:
+    """Step 3 (Fallback): Use Geocoding API with component filtering."""
+    if not GOOGLE_MAPS_API_KEY:
+        return None
+    params = {
+        "address": address,
+        "region": "in",
+        "key": GOOGLE_MAPS_API_KEY,
+    }
+    if state:
+        params["components"] = f"administrative_area:{state}|country:IN"
+
+    try:
+        resp = requests.get(
+            "https://maps.googleapis.com/maps/api/geocode/json",
+            params=params,
+            timeout=10,
+        )
+        data = resp.json()
+        status = data.get("status", "")
+        if status in ("OVER_QUERY_LIMIT", "REQUEST_DENIED"):
+            print(f"[Geocode] Geocoding API error: {status} — {data.get('error_message', '')}")
+            return None
+        if status == "ZERO_RESULTS":
+            return None
+        if status == "OK" and data.get("results"):
+            # Pick the highest-confidence result
+            best = None
+            for result in data["results"]:
+                loc_type = result.get("geometry", {}).get("location_type", "APPROXIMATE")
+                if loc_type in _ACCEPTABLE_LOCATION_TYPES:
+                    best = result
+                    break
+            # If no high-confidence result, take the first one anyway
+            if best is None:
+                best = data["results"][0]
+
+            geo = best["geometry"]["location"]
+            return {
+                "lat": geo["lat"],
+                "lng": geo["lng"],
+                "formatted_address": best.get("formatted_address", ""),
+                "place_id": best.get("place_id", ""),
+                "location_type": best.get("geometry", {}).get("location_type", "APPROXIMATE"),
+            }
+    except Exception as e:
+        print(f"[Geocode] Geocoding API exception: {e}")
+    return None
+
+
 def _geocode_park(park_name: str, district: str, state: str) -> Dict:
-    """Return lat/lng for a park using Google Maps Places/Geocoding API."""
+    """
+    Precise geocoding pipeline:
+      1. Find Place API  (best for named POIs like industrial parks)
+      2. Place Details    (rooftop-level coords from place_id)
+      3. Geocoding API    (structured address fallback)
+
+    Returns: {lat, lng, formatted_address, place_id, location_type}
+    """
     if not GOOGLE_MAPS_API_KEY:
         return {}
 
-    # 1. Try Places API Text Search (much better for POIs and Industrial Parks)
-    # Appending "Industrial" to avoid matching random generic places if name is vague
-    places_query = f"{park_name} Industrial {district} {state} India"
-    try:
-        places_resp = requests.get(
-            "https://maps.googleapis.com/maps/api/place/textsearch/json",
-            params={"query": places_query, "key": GOOGLE_MAPS_API_KEY},
-            timeout=10,
-        )
-        places_data = places_resp.json()
-        if places_data.get("status") == "OK" and places_data.get("results"):
-            # Prevent cross-border results (e.g. Dimapur instead of Assam)
-            # If the state name isn't in the address, it might be a false positive across the border.
-            loc = places_data["results"][0]["geometry"]["location"]
-            addr = places_data["results"][0].get("formatted_address", "")
-            return {
-                "lat": loc["lat"],
-                "lng": loc["lng"],
-                "formatted_address": addr,
-            }
-    except Exception:
-        pass
+    # ── Step 1: Find Place From Text ─────────────────────────────────────
+    search_query = f"{park_name}, {district}, {state}, India"
+    candidate = _find_place_from_text(search_query)
 
-    # 2. Try Geocoding API with STRICT state component filtering (Fallback 1)
-    # This completely prevents Google from returning a location in a neighboring state!
-    query = f"{park_name}, {district}, India"
-    try:
-        resp = requests.get(
-            "https://maps.googleapis.com/maps/api/geocode/json",
-            params={
-                "address": query, 
-                "components": f"administrative_area:{state}|country:IN",
-                "key": GOOGLE_MAPS_API_KEY, 
-                "region": "in"
-            },
-            timeout=10,
-        )
-        data = resp.json()
-        if data.get("status") == "OK" and data["results"]:
-            loc = data["results"][0]["geometry"]["location"]
-            return {
-                "lat": loc["lat"],
-                "lng": loc["lng"],
-                "formatted_address": data["results"][0].get("formatted_address", ""),
-            }
-    except Exception:
-        pass
+    if candidate:
+        place_id = candidate.get("place_id")
+        if place_id:
+            # ── Step 2: Place Details for precise coords ─────────────────
+            details = _get_place_details(place_id)
+            if details and details.get("lat"):
+                return details
 
-    # 3. Try District Level Geocoding (Fallback 2: avoids random state-wide scatter)
-    district_query = f"{district}, India"
-    try:
-        resp = requests.get(
-            "https://maps.googleapis.com/maps/api/geocode/json",
-            params={
-                "address": district_query, 
-                "components": f"administrative_area:{state}|country:IN",
-                "key": GOOGLE_MAPS_API_KEY, 
-                "region": "in"
-            },
-            timeout=10,
-        )
-        data = resp.json()
-        if data.get("status") == "OK" and data["results"]:
-            loc = data["results"][0]["geometry"]["location"]
+        # If Place Details failed, use the geometry from the candidate itself
+        geo = candidate.get("geometry", {}).get("location", {})
+        if geo.get("lat"):
             return {
-                "lat": loc["lat"],
-                "lng": loc["lng"],
-                "formatted_address": data["results"][0].get("formatted_address", ""),
+                "lat": geo["lat"],
+                "lng": geo["lng"],
+                "formatted_address": candidate.get("formatted_address", ""),
+                "place_id": candidate.get("place_id", ""),
+                "location_type": "FIND_PLACE",
             }
-    except Exception:
-        pass
+
+    # ── Step 3: Geocoding API fallback (structured address) ──────────────
+    # Try park name + district + state first
+    result = _geocode_with_address(f"{park_name}, {district}, {state}, India", state)
+    if result and result.get("lat"):
+        return result
+
+    # Try just district + state as last resort
+    result = _geocode_with_address(f"{district}, {state}, India", state)
+    if result and result.get("lat"):
+        return result
 
     return {}
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -238,37 +325,16 @@ def scrape_park(park: Dict, user_sector: str = "") -> Dict:
 
     enriched = {**park, "name": name}
 
-    # Step 3a — Geocode
+    # Step 3a — Geocode (precise Google Maps workflow)
     geo = _geocode_park(name, district, state)
     if not geo or not geo.get("lat"):
-        # Fallback: state-level bounding boxes (guaranteed on land)
-        STATE_BBOX = {
-            "GUJARAT":           (21.6, 71.5),
-            "MAHARASHTRA":       (18.9, 75.7),
-            "KARNATAKA":         (14.5, 76.0),
-            "TAMIL NADU":        (11.1, 78.7),
-            "TELANGANA":         (17.4, 78.5),
-            "ANDHRA PRADESH":    (15.9, 79.7),
-            "UTTAR PRADESH":     (26.8, 80.9),
-            "WEST BENGAL":       (22.5, 87.3),
-            "RAJASTHAN":         (26.2, 73.0),
-            "HARYANA":           (29.1, 76.5),
-            "PUNJAB":            (31.1, 75.3),
-            "MADHYA PRADESH":    (23.2, 77.4),
-            "ODISHA":            (20.3, 84.8),
-            "JHARKHAND":         (23.6, 85.2),
-            "CHHATTISGARH":      (21.3, 81.9),
-            "UTTARAKHAND":       (30.1, 79.1),
-            "HIMACHAL PRADESH":  (31.5, 77.2),
-            "KERALA":            (10.9, 76.3),
-            "GOA":               (15.3, 74.0),
-            "ASSAM":             (26.2, 92.9),
-        }
-        base = STATE_BBOX.get(state.strip().upper(), (22.0, 78.5))
+        # All Google APIs failed — do NOT fabricate coordinates
+        print(f"[Scraper] WARNING: Could not geocode '{name}' in {district}, {state}. Skipping map pin.")
         geo = {
-            "lat": round(base[0] + (random.random() - 0.5) * 1.5, 5),
-            "lng": round(base[1] + (random.random() - 0.5) * 1.5, 5),
-            "formatted_address": f"{name}, {district}, {state}, India"
+            "lat": None,
+            "lng": None,
+            "formatted_address": f"{name}, {district}, {state}, India",
+            "location_type": "FAILED",
         }
     enriched.update(geo)
 
