@@ -2,6 +2,8 @@
 
 > **Built for the GoogleX Hackathon** in collaboration with **DeepStation**
 
+[![Live Demo deployed on Cloud Run](https://img.shields.io/badge/Live%20Demo-Available%20Here-success?style=for-the-badge&logo=googlecloud)](https://startupadvisor-715560536783.asia-south1.run.app)
+
 An AI-powered multi-agent platform that helps investors and entrepreneurs identify the **best industrial parks** across India by combining real-time web scraping, Google Maps intelligence, government scheme matching, and Gemini AI deep research — all in a single unified pipeline.
 
 ---
