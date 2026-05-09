@@ -296,6 +296,41 @@
             color: var(--primary);
         }
 
+        /* ROI Calculator */
+        .roi-btn {
+            width: 100%;
+            padding: 0.6rem;
+            margin-top: 0.75rem;
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 0.8125rem;
+            transition: all 0.2s ease;
+        }
+        .roi-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3); }
+        .roi-btn.active { background: linear-gradient(135deg, #7c3aed, #4f46e5); }
+        .roi-panel {
+            display: none;
+            background: linear-gradient(135deg, #1e1b4b, #312e81);
+            border: 1px solid #4338ca;
+            border-radius: var(--radius-md);
+            padding: 1rem;
+            margin-top: 0.75rem;
+            color: #e0e7ff;
+            font-size: 0.8125rem;
+        }
+        .roi-stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+        }
+        .roi-label { color: #a5b4fc; }
+        .roi-value { font-weight: 700; font-size: 0.9rem; }
+
         .subsidy-box {
             background: var(--accent);
             color: white;
@@ -566,6 +601,9 @@
         }
 
         // --- Pipeline Execution ---
+        let allResults = [];
+        let currentRequirements = {};
+
         document.getElementById('advisorForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -584,6 +622,7 @@
                 is_msme: document.getElementById('is_msme').checked,
                 max_results: 15 // Limit for speed
             };
+            currentRequirements = reqs;
 
             // Switch UI
             document.getElementById('advisorForm').style.display = 'none';
@@ -660,6 +699,7 @@
 
         // --- Render Results ---
         function renderResults(parks) {
+            allResults = parks;  // Store globally for ROI access
             document.getElementById('progressContainer').style.display = 'none';
             document.getElementById('resultsPanel').style.display = 'block';
             
@@ -841,6 +881,9 @@
                         <button onclick='exportReport(${JSON.stringify(park).replace(/'/g, "&#39;")}, "pdf")' style="flex: 1; padding: 0.5rem; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">📄 Export PDF Report</button>
                         <button onclick='exportReport(${JSON.stringify(park).replace(/'/g, "&#39;")}, "excel")' style="flex: 1; padding: 0.5rem; background: #16a34a; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">📊 Export Excel Data</button>
                     </div>
+
+                    <button class="roi-btn" id="roibtn-${index}" onclick="toggleROI(${index})">📊 Calculate Investment ROI</button>
+                    <div class="roi-panel" id="roi-panel-${index}"></div>
                 `;
 
                 list.appendChild(card);
@@ -906,6 +949,58 @@
                 window.URL.revokeObjectURL(url);
             } catch (err) {
                 alert("Error exporting report: " + err.message);
+            }
+        }
+
+        // ── ROI Calculator ───────────────────────────────────────────────────
+        async function toggleROI(index) {
+            const panel = document.getElementById(`roi-panel-${index}`);
+            const btn = document.getElementById(`roibtn-${index}`);
+            if (panel.dataset.loaded && panel.style.display !== 'none') {
+                panel.style.display = 'none';
+                btn.classList.remove('active');
+                return;
+            }
+            panel.style.display = 'block';
+            btn.classList.add('active');
+            if (panel.dataset.loaded) return;
+
+            panel.innerHTML = '<div style="text-align:center;color:#a5b4fc;padding:1rem;font-size:0.85rem;">⏳ Calculating ROI with Gemini...</div>';
+
+            const park = allResults[index];
+            const s = park.schemes || {};
+            try {
+                const res = await fetch('/api/roi-calculator', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        park_name: park.name,
+                        state: park.state,
+                        sector: currentRequirements.sector || 'manufacturing',
+                        investment_inr: currentRequirements.investment_inr || 0,
+                        subsidy_cr: s.total_subsidy_cr || 0,
+                        employment: currentRequirements.employment || 100
+                    })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    const r = data.roi;
+                    panel.innerHTML = `
+                        <div style="font-weight:700;color:#818cf8;margin-bottom:0.75rem;font-size:0.9rem;">💹 Investment ROI Analysis</div>
+                        <div class="roi-stat"><span class="roi-label">Break-Even Timeline</span><span class="roi-value" style="color:#10b981;">${r.break_even_years} yrs</span></div>
+                        <div class="roi-stat"><span class="roi-label">Projected ROI</span><span class="roi-value" style="color:#818cf8;">${r.roi_percentage}%</span></div>
+                        <div class="roi-stat"><span class="roi-label">Payback Period</span><span class="roi-value">${r.payback_months} months</span></div>
+                        <div class="roi-stat"><span class="roi-label">Revenue (Yr 3)</span><span class="roi-value">₹${r.revenue_year3_cr} Cr</span></div>
+                        <div class="roi-stat" style="border:none;"><span class="roi-label">NPV Estimate</span><span class="roi-value" style="color:#f59e0b;">₹${r.npv_estimate_cr} Cr</span></div>
+                        <p style="font-size:0.8rem;color:#94a3b8;margin-top:0.75rem;line-height:1.5;">${r.roi_narrative}</p>
+                        ${r.key_opportunities?.length ? `<div style="font-size:0.78rem;color:#34d399;margin-top:0.5rem;">✅ ${r.key_opportunities.join(' · ')}</div>` : ''}
+                        ${r.key_risks?.length ? `<div style="font-size:0.78rem;color:#f87171;margin-top:0.25rem;">⚠️ ${r.key_risks.join(' · ')}</div>` : ''}`;
+                    panel.dataset.loaded = '1';
+                } else {
+                    panel.innerHTML = `<div style="color:#f87171;">❌ ${data.message || 'Failed to calculate ROI'}</div>`;
+                }
+            } catch (e) {
+                panel.innerHTML = `<div style="color:#f87171;">❌ ${e.message}</div>`;
             }
         }
     </script>
