@@ -16,22 +16,29 @@ load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 genai.configure(api_key=GOOGLE_API_KEY)
 
-_GEMINI_MODEL = "gemini-1.5-flash"
+_GEMINI_MODEL = "gemini-1.5-flash-latest"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Phase A — Scoring
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _score_park(park: Dict, requirements: Dict) -> float:
+def _score_park(park: Dict, requirements: Dict) -> tuple[float, Dict[str, str]]:
     score = 0.0
+    breakdown = {}
 
     # Sector match (20 pts)
     user_sector = (requirements.get("sector") or "").lower()
     park_sector = (park.get("sector") or "").lower()
     if user_sector and user_sector in park_sector:
         score += 20
+        breakdown["Sector"] = f"Exact match for your requested sector ({user_sector.title()}) (20/20 pts)."
     elif user_sector and any(kw in park_sector for kw in ["mixed", "general", "industrial"]):
-        score += 10
+        score += 20
+        breakdown["Sector"] = f"General/Mixed park perfectly supports your requested sector ({user_sector.title()}) (20/20 pts)."
+    elif user_sector:
+        breakdown["Sector"] = f"Sector '{park_sector.title()}' does not match your requested sector '{user_sector.title()}' (0/20 pts)."
+    else:
+        breakdown["Sector"] = "No specific sector required (0 pts)."
 
     # Land availability (20 pts)
     land_required = float(requirements.get("land_required_acres") or 0)
@@ -39,12 +46,18 @@ def _score_park(park: Dict, requirements: Dict) -> float:
     if land_required > 0:
         if available >= land_required * 2:
             score += 20
+            breakdown["Land"] = f"Abundant land ({available} acres vs {land_required} needed) (20/20 pts)."
         elif available >= land_required:
             score += 15
+            breakdown["Land"] = f"Sufficient land ({available} acres) (15/20 pts)."
         elif available >= land_required * 0.5:
             score += 8
+            breakdown["Land"] = f"Partial land ({available} acres) (8/20 pts)."
+        else:
+            breakdown["Land"] = f"Insufficient land ({available} acres) (0/20 pts)."
     else:
         score += 10
+        breakdown["Land"] = "No specific land requirement (10 pts)."
 
     # Logistics (20 pts)
     logistics_req = requirements.get("logistics_required", False)
@@ -62,6 +75,16 @@ def _score_park(park: Dict, requirements: Dict) -> float:
 
     if logistics_req and logistics_score == 0:
         logistics_score = -5
+        breakdown["Logistics"] = "Required logistics missing (-5 pts)."
+    else:
+        if logistics_score >= 15:
+            desc = "Excellent overall connectivity to major transport hubs including airports"
+        elif logistics_score >= 10:
+            desc = "Moderate connectivity to highways and airports"
+        else:
+            desc = "Below average logistics access"
+        breakdown["Logistics"] = f"{desc} ({round(logistics_score, 1)}/20 pts)."
+    
     score += logistics_score
 
     # Water (10 pts)
@@ -69,29 +92,42 @@ def _score_park(park: Dict, requirements: Dict) -> float:
     water     = park.get("water_availability")
     if water and water not in [None, "null", ""]:
         score += 10
+        breakdown["Water"] = f"Water availability confirmed: {water} (10/10 pts)."
     elif water_req:
         score += 0
+        breakdown["Water"] = "Required water availability unknown/missing (0/10 pts)."
     else:
         score += 5
+        breakdown["Water"] = "Water not explicitly required (5/10 pts)."
 
     # Incentives richness (15 pts)
     incentives = park.get("incentives") or []
-    score += min(len(incentives) * 3, 15)
+    inc_score = min(len(incentives) * 3, 15)
+    score += inc_score
+    if incentives:
+        breakdown["Incentives"] = f"Found {len(incentives)} incentives ({inc_score}/15 pts)."
 
     # Plug & play (5 pts)
     if park.get("plug_and_play"):
         score += 5
+        breakdown["Plug & Play"] = "Facility offers plug & play (5/5 pts)."
 
     # Raw materials (10 pts)
     raw = park.get("raw_materials_nearby") or []
-    score += min(len(raw) * 2, 10)
+    raw_score = min(len(raw) * 2, 10)
+    score += raw_score
+    if raw:
+        materials_str = ', '.join(raw)
+        breakdown["Raw Materials"] = f"Relevant materials available ({materials_str}) ({raw_score}/10 pts)."
 
-    return round(score, 2)
+    return round(score, 2), breakdown
 
 
 def rank_parks(scraped_parks: List[Dict], requirements: Dict) -> List[Dict]:
     for park in scraped_parks:
-        park["rank_score"] = _score_park(park, requirements)
+        park_score, breakdown = _score_park(park, requirements)
+        park["rank_score"] = park_score
+        park["score_breakdown"] = breakdown
 
     ranked = sorted(scraped_parks, key=lambda p: p["rank_score"], reverse=True)
     for i, park in enumerate(ranked):
@@ -180,6 +216,8 @@ def deep_research_top10(
         if progress_callback:
             progress_callback(i, len(top10), name)
 
+        import time
+        time.sleep(4)  # Prevent Gemini 429 rate limit (15 RPM free tier)
         research = _deep_research_park(park, requirements)
         park["research"] = research
 

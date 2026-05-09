@@ -124,7 +124,8 @@ def run_pipeline():
 
     def generate():
         def _sse(payload: dict) -> str:
-            return f"data: {json.dumps(payload)}\n\n"
+            # Pad with 1024 spaces to force Werkzeug/proxy buffer flush and prevent timeout connection resets
+            return f"data: {json.dumps(payload)}\n\n" + (" " * 1024) + "\n"
 
         # ── Save session ───────────────────────────────────────────────────
         try:

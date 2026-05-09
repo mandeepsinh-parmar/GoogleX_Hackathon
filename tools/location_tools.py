@@ -100,6 +100,11 @@ def _sector_matches(park_sector: str, query_sector: str) -> bool:
     if not query_sector:
         return True
     park_sector_lower = (park_sector or "").lower()
+    
+    # Multi-purpose parks can accommodate any sector
+    if any(kw in park_sector_lower for kw in ["mixed", "general", "industrial"]):
+        return True
+        
     keywords = SECTOR_KEYWORDS.get(query_sector.lower(), [query_sector.lower()])
     return any(kw in park_sector_lower for kw in keywords)
 

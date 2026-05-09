@@ -24,22 +24,52 @@ GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
 
 genai.configure(api_key=GOOGLE_API_KEY)
 
-_GEMINI_MODEL = "gemini-1.5-flash"
+_GEMINI_MODEL = "gemini-1.5-flash-latest"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Geocoding
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _geocode_park(park_name: str, district: str, state: str) -> Dict:
-    """Return lat/lng for a park using Google Maps Geocoding API."""
+    """Return lat/lng for a park using Google Maps Places/Geocoding API."""
     if not GOOGLE_MAPS_API_KEY:
         return {}
 
-    query = f"{park_name}, {district}, {state}, India"
+    # 1. Try Places API Text Search (much better for POIs and Industrial Parks)
+    # Appending "Industrial" to avoid matching random generic places if name is vague
+    places_query = f"{park_name} Industrial {district} {state} India"
+    try:
+        places_resp = requests.get(
+            "https://maps.googleapis.com/maps/api/place/textsearch/json",
+            params={"query": places_query, "key": GOOGLE_MAPS_API_KEY},
+            timeout=10,
+        )
+        places_data = places_resp.json()
+        if places_data.get("status") == "OK" and places_data.get("results"):
+            # Prevent cross-border results (e.g. Dimapur instead of Assam)
+            # If the state name isn't in the address, it might be a false positive across the border.
+            loc = places_data["results"][0]["geometry"]["location"]
+            addr = places_data["results"][0].get("formatted_address", "")
+            return {
+                "lat": loc["lat"],
+                "lng": loc["lng"],
+                "formatted_address": addr,
+            }
+    except Exception:
+        pass
+
+    # 2. Try Geocoding API with STRICT state component filtering (Fallback 1)
+    # This completely prevents Google from returning a location in a neighboring state!
+    query = f"{park_name}, {district}, India"
     try:
         resp = requests.get(
             "https://maps.googleapis.com/maps/api/geocode/json",
-            params={"address": query, "key": GOOGLE_MAPS_API_KEY, "region": "in"},
+            params={
+                "address": query, 
+                "components": f"administrative_area:{state}|country:IN",
+                "key": GOOGLE_MAPS_API_KEY, 
+                "region": "in"
+            },
             timeout=10,
         )
         data = resp.json()
@@ -52,6 +82,31 @@ def _geocode_park(park_name: str, district: str, state: str) -> Dict:
             }
     except Exception:
         pass
+
+    # 3. Try District Level Geocoding (Fallback 2: avoids random state-wide scatter)
+    district_query = f"{district}, India"
+    try:
+        resp = requests.get(
+            "https://maps.googleapis.com/maps/api/geocode/json",
+            params={
+                "address": district_query, 
+                "components": f"administrative_area:{state}|country:IN",
+                "key": GOOGLE_MAPS_API_KEY, 
+                "region": "in"
+            },
+            timeout=10,
+        )
+        data = resp.json()
+        if data.get("status") == "OK" and data["results"]:
+            loc = data["results"][0]["geometry"]["location"]
+            return {
+                "lat": loc["lat"],
+                "lng": loc["lng"],
+                "formatted_address": data["results"][0].get("formatted_address", ""),
+            }
+    except Exception:
+        pass
+
     return {}
 
 
@@ -234,14 +289,26 @@ def scrape_park(park: Dict, user_sector: str = "") -> Dict:
     enriched.update(logistics)
 
     # Step 3c — Gemini research (water, raw materials, incentives)
-    time.sleep(0.5)   # gentle rate limiting
+    # Strict rate limiting to avoid 429 Too Many Requests (15 RPM free tier limit = 1 req / 4 sec)
+    time.sleep(4)
     research = _gemini_research(name, district, state, sector)
     
     # Fallback if Gemini quota exceeded or failed
     if not research.get("water_availability"):
         research["water_availability"] = "Municipal/Local River Supply (24/7)"
     if not research.get("raw_materials_nearby"):
-        research["raw_materials_nearby"] = ["Steel", "Cement", "Plastics", "Chemicals"][:min(4, len(sector) if sector else 4)]
+        sector_mats = {
+            "electronics": ["Silicon", "Copper", "Plastics", "Aluminum"],
+            "automobile": ["Steel", "Rubber", "Aluminum", "Glass"],
+            "pharma": ["Active Pharmaceutical Ingredients (APIs)", "Chemicals", "Packaging Glass"],
+            "textile": ["Cotton", "Yarn", "Dyes", "Synthetic Fibers"],
+            "food_processing": ["Agricultural Produce", "Packaging Materials", "Cold Storage Gas"],
+            "IT": ["Electronic Components", "Fiber Optics"],
+            "renewable_energy": ["Silicon", "Metals", "Glass"],
+            "chemicals": ["Petrochemicals", "Salts", "Acids", "Solvents"],
+        }
+        fallback_mats = sector_mats.get((sector or "").lower(), ["Steel", "Cement", "Plastics", "Chemicals"])
+        research["raw_materials_nearby"] = fallback_mats
     if not research.get("incentives"):
         research["incentives"] = ["5-Year Tax Exemption", "Stamp Duty Waiver", "Power Subsidy"]
     if not research.get("description"):

@@ -372,14 +372,36 @@
                         <label>Preferred State (Optional)</label>
                         <select id="state">
                             <option value="">Any State</option>
+                            <option value="ANDHRA PRADESH">Andhra Pradesh</option>
+                            <option value="ARUNACHAL PRADESH">Arunachal Pradesh</option>
+                            <option value="ASSAM">Assam</option>
+                            <option value="BIHAR">Bihar</option>
+                            <option value="CHHATTISGARH">Chhattisgarh</option>
+                            <option value="DELHI">Delhi</option>
+                            <option value="GOA">Goa</option>
                             <option value="GUJARAT">Gujarat</option>
-                            <option value="MAHARASHTRA">Maharashtra</option>
+                            <option value="HARYANA">Haryana</option>
+                            <option value="HIMACHAL PRADESH">Himachal Pradesh</option>
+                            <option value="JAMMU & KASHMIR">Jammu & Kashmir</option>
+                            <option value="JHARKHAND">Jharkhand</option>
                             <option value="KARNATAKA">Karnataka</option>
+                            <option value="KERALA">Kerala</option>
+                            <option value="MADHYA PRADESH">Madhya Pradesh</option>
+                            <option value="MAHARASHTRA">Maharashtra</option>
+                            <option value="MANIPUR">Manipur</option>
+                            <option value="MEGHALAYA">Meghalaya</option>
+                            <option value="MIZORAM">Mizoram</option>
+                            <option value="NAGALAND">Nagaland</option>
+                            <option value="ODISHA">Odisha</option>
+                            <option value="PUNJAB">Punjab</option>
+                            <option value="RAJASTHAN">Rajasthan</option>
+                            <option value="SIKKIM">Sikkim</option>
                             <option value="TAMIL NADU">Tamil Nadu</option>
                             <option value="TELANGANA">Telangana</option>
+                            <option value="TRIPURA">Tripura</option>
                             <option value="UTTAR PRADESH">Uttar Pradesh</option>
-                            <option value="WEST BENGAL">West Bengal</option>
                             <option value="UTTARAKHAND">Uttarakhand</option>
+                            <option value="WEST BENGAL">West Bengal</option>
                         </select>
                     </div>
 
@@ -720,14 +742,24 @@
                             <span class="info-value" style="text-transform: capitalize;">${park.sector || 'Mixed'}</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">Highway Access</span>
-                            <span class="info-value">${hw}</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">Airport</span>
-                            <span class="info-value">${air}</span>
+                            <span class="info-label">Logistics (HW / Air)</span>
+                            <span class="info-value">${hw} / ${air}</span>
                         </div>
                     </div>
+
+                    ${ park.score_breakdown ? `
+                    <div style="margin-top: 1rem; font-size: 0.8125rem; padding: 1rem; background: #f8fafc; border-radius: var(--radius-md); border: 1px solid var(--border);">
+                        <strong style="color: var(--primary); display: block; margin-bottom: 0.75rem; font-size: 0.875rem;">📊 Score Breakdown</strong>
+                        <ul style="list-style-type: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem;">
+                            ${Object.entries(park.score_breakdown).map(([key, value]) => `
+                            <li style="display: flex; gap: 0.5rem;">
+                                <strong style="color: var(--text-main); min-width: 80px;">${key}:</strong>
+                                <span style="color: var(--text-muted); line-height: 1.4;">${value}</span>
+                            </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                    ` : ''}
 
                     ${ (s.central_schemes && s.central_schemes.length > 0) || (s.state_schemes && s.state_schemes.length > 0) ? `
                     <div style="margin-top: 1rem; font-size: 0.8125rem; padding: 1rem; background: linear-gradient(135deg, #f0fdf4, #f8fafc); border-radius: var(--radius-md); border: 1px solid #bbf7d0;">
