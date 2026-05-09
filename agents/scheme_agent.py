@@ -96,7 +96,7 @@ CRITICAL: Only include schemes you are confident actually exist. Use real URLs f
 
     try:
         response = client.models.generate_content(
-            model="gemini-1.5-flash-latest",
+            model="gemini-1.5-flash",
             contents=prompt,
             config=types.GenerateContentConfig(
                 tools=[types.Tool(google_search=types.GoogleSearch())],

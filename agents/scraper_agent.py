@@ -24,7 +24,7 @@ GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
 
 genai.configure(api_key=GOOGLE_API_KEY)
 
-_GEMINI_MODEL = "gemini-1.5-flash-latest"
+_GEMINI_MODEL = "gemini-1.5-flash"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Geocoding

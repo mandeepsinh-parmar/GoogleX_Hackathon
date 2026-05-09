@@ -8,15 +8,16 @@ import json
 import os
 from typing import Dict, List
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 
 load_dotenv()
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
-genai.configure(api_key=GOOGLE_API_KEY)
+client = genai.Client(api_key=GOOGLE_API_KEY)
 
-_GEMINI_MODEL = "gemini-1.5-flash-latest"
+_GEMINI_MODEL = "gemini-1.5-flash"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Phase A — Scoring
@@ -179,10 +180,10 @@ Return ONLY a valid JSON object:
 """
 
     try:
-        model = genai.GenerativeModel(model_name=_GEMINI_MODEL)
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.GenerationConfig(
+        response = client.models.generate_content(
+            model=_GEMINI_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(
                 temperature=0.2,
                 max_output_tokens=1000,
                 response_mime_type="application/json",
