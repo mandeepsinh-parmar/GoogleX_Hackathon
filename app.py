@@ -437,6 +437,39 @@ def geocode():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+from flask import send_file
+import io
+
+@app.route('/api/export/pdf', methods=['POST'])
+def export_pdf():
+    data = request.json or {}
+    try:
+        from tools.export_tools import generate_pdf_report
+        pdf_buffer = generate_pdf_report(data)
+        return send_file(
+            pdf_buffer,
+            as_attachment=True,
+            download_name=f"{data.get('name', 'Park').replace(' ', '_')}_Report.pdf",
+            mimetype='application/pdf'
+        )
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/export/excel', methods=['POST'])
+def export_excel():
+    data = request.json or {}
+    try:
+        from tools.export_tools import generate_excel_report
+        excel_buffer = generate_excel_report(data)
+        return send_file(
+            excel_buffer,
+            as_attachment=True,
+            download_name=f"{data.get('name', 'Park').replace(' ', '_')}_Data.xlsx",
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 # ═══════════════════════════════════════════════════════════════════════════
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)

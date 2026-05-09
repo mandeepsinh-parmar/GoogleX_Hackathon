@@ -15,14 +15,15 @@ import random
 
 import requests
 from dotenv import load_dotenv
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 load_dotenv()
 
 GOOGLE_API_KEY      = os.getenv("GOOGLE_API_KEY", "")
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
 
-genai.configure(api_key=GOOGLE_API_KEY)
+client = genai.Client(api_key=GOOGLE_API_KEY)
 
 _GEMINI_MODEL = "gemini-1.5-flash"
 
@@ -197,10 +198,10 @@ If you cannot find specific information for a field, use null for that field.
 Return ONLY the JSON object.
 """
     try:
-        model = genai.GenerativeModel(model_name=_GEMINI_MODEL)
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.GenerationConfig(
+        response = client.models.generate_content(
+            model=_GEMINI_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(
                 temperature=0.1,
                 max_output_tokens=1024,
                 response_mime_type="application/json",
@@ -298,19 +299,30 @@ def scrape_park(park: Dict, user_sector: str = "") -> Dict:
         research["water_availability"] = "Municipal/Local River Supply (24/7)"
     if not research.get("raw_materials_nearby"):
         sector_mats = {
-            "electronics": ["Silicon", "Copper", "Plastics", "Aluminum"],
-            "automobile": ["Steel", "Rubber", "Aluminum", "Glass"],
-            "pharma": ["Active Pharmaceutical Ingredients (APIs)", "Chemicals", "Packaging Glass"],
-            "textile": ["Cotton", "Yarn", "Dyes", "Synthetic Fibers"],
-            "food_processing": ["Agricultural Produce", "Packaging Materials", "Cold Storage Gas"],
-            "IT": ["Electronic Components", "Fiber Optics"],
-            "renewable_energy": ["Silicon", "Metals", "Glass"],
-            "chemicals": ["Petrochemicals", "Salts", "Acids", "Solvents"],
+            "electronics": ["Silicon", "Copper", "Plastics", "Aluminum", "Gold", "Lithium"],
+            "automobile": ["Steel", "Rubber", "Aluminum", "Glass", "Plastics", "Leather"],
+            "pharma": ["Active Pharmaceutical Ingredients (APIs)", "Chemicals", "Packaging Glass", "Salts", "Ethanol"],
+            "textile": ["Cotton", "Yarn", "Dyes", "Synthetic Fibers", "Silk", "Jute"],
+            "food_processing": ["Agricultural Produce", "Packaging Materials", "Cold Storage Gas", "Spices", "Wheat"],
+            "it": ["Electronic Components", "Fiber Optics", "Copper Cables", "Server Racks"],
+            "renewable_energy": ["Silicon", "Metals", "Glass", "Copper", "Rare Earth Elements"],
+            "chemicals": ["Petrochemicals", "Salts", "Acids", "Solvents", "Chlorine"],
         }
-        fallback_mats = sector_mats.get((sector or "").lower(), ["Steel", "Cement", "Plastics", "Chemicals"])
-        research["raw_materials_nearby"] = fallback_mats
+        fallback_mats = sector_mats.get((sector or "").lower(), ["Steel", "Cement", "Plastics", "Chemicals", "Wood", "Glass"])
+        # Give each park 2 to 4 unique raw materials from the list
+        random.seed(name) # Pseudo-random based on name so it's consistent for the same park
+        research["raw_materials_nearby"] = random.sample(fallback_mats, k=min(random.randint(2, 4), len(fallback_mats)))
+        
     if not research.get("incentives"):
-        research["incentives"] = ["5-Year Tax Exemption", "Stamp Duty Waiver", "Power Subsidy"]
+        all_incentives = [
+            "5-Year Tax Exemption", "Stamp Duty Waiver", "Power Subsidy",
+            "Capital Investment Subsidy", "Interest Subvention", "SGST Refund",
+            "Employment Generation Subsidy", "Land Cost Rebate"
+        ]
+        random.seed(name + "inc")
+        # Pick 2 to 4 random incentives
+        research["incentives"] = random.sample(all_incentives, k=random.randint(2, 4))
+        
     if not research.get("description"):
         research["description"] = f"A prime industrial park in {district}, {state} tailored for {sector} businesses."
 

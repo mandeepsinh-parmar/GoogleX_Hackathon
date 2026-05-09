@@ -677,12 +677,32 @@
                 
                 if (park.lat && park.lng) bounds.extend(pos);
 
+                // Determine Pin Color based on rank_score
+                let pinColor = "#ef4444"; // red for below 50
+                let labelColor = "white";
+                if (park.rank_score >= 70) {
+                    pinColor = "#10b981"; // green for 70 and above
+                } else if (park.rank_score >= 50) {
+                    pinColor = "#eab308"; // yellow for 50-69.9
+                    labelColor = "black";
+                }
+
                 // Create Map Marker
                 const marker = new google.maps.Marker({
                     position: pos,
                     map: map,
-                    label: { text: `${index + 1}`, color: "white", fontWeight: "bold" },
+                    label: { text: `${index + 1}`, color: labelColor, fontWeight: "bold" },
                     title: park.name,
+                    icon: {
+                        path: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z",
+                        fillColor: pinColor,
+                        fillOpacity: 1,
+                        strokeColor: "#ffffff",
+                        strokeWeight: 1.5,
+                        scale: 1.5,
+                        anchor: new google.maps.Point(12, 22),
+                        labelOrigin: new google.maps.Point(12, 9)
+                    },
                     animation: google.maps.Animation.DROP
                 });
 
@@ -816,6 +836,11 @@
                         </div>
                         ${r.summary_paragraph || 'Strong candidate matching your criteria.'}
                     </div>
+                    
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                        <button onclick='exportReport(${JSON.stringify(park).replace(/'/g, "&#39;")}, "pdf")' style="flex: 1; padding: 0.5rem; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">📄 Export PDF Report</button>
+                        <button onclick='exportReport(${JSON.stringify(park).replace(/'/g, "&#39;")}, "excel")' style="flex: 1; padding: 0.5rem; background: #16a34a; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">📊 Export Excel Data</button>
+                    </div>
                 `;
 
                 list.appendChild(card);
@@ -834,6 +859,33 @@
         function clearMarkers() {
             markers.forEach(m => m.setMap(null));
             markers = [];
+        }
+
+        async function exportReport(park, format) {
+            try {
+                const response = await fetch(`/api/export/${format}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(park)
+                });
+                
+                if (!response.ok) throw new Error('Export failed');
+                
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                const ext = format === 'pdf' ? 'pdf' : 'xlsx';
+                a.download = `${park.name.replace(/ /g, '_')}_Report.${ext}`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+            } catch (err) {
+                alert("Error exporting report: " + err.message);
+            }
         }
     </script>
 </body>

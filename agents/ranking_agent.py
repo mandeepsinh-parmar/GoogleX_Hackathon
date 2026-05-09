@@ -119,7 +119,7 @@ def _score_park(park: Dict, requirements: Dict) -> tuple[float, Dict[str, str]]:
     score += raw_score
     if raw:
         materials_str = ', '.join(raw)
-        breakdown["Raw Materials"] = f"Relevant materials available ({materials_str}) ({raw_score}/10 pts)."
+        breakdown["Raw Materials"] = f"Raw materials available ({materials_str}) ({raw_score}/10 pts)."
 
     return round(score, 2), breakdown
 
