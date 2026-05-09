@@ -1,0 +1,14 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.env
+.git/
+.gitignore
+docs/
+*.md
+!requirements.txt
+test_*.py
+*.log
+*.txt
+!requirements.txt
