@@ -1,9 +1,21 @@
-google-generativeai>=0.8.0
-google-adk>=0.3.0
+# ── Core Framework ────────────────────────────────
 flask>=3.0.0
+flask-cors>=4.0.0
 python-dotenv>=1.0.0
 requests>=2.31.0
+
+# ── Google AI ─────────────────────────────────────
+google-genai>=1.0.0
+
+# ── Google Maps (via requests, no extra package) ──
+
+# ── Database ──────────────────────────────────────
 pymongo>=4.6.0
+
+# ── Web Scraping ──────────────────────────────────
 beautifulsoup4>=4.12.0
 lxml>=5.0.0
-flask-cors>=4.0.0
+
+# ── Report Generation ────────────────────────────
+reportlab>=4.0.0
+openpyxl>=3.1.0

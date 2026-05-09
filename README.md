@@ -1,97 +1,236 @@
-# Startup India Advisor 🚀
+# 🏭 Multi-Agent Industrial Geolocation Engine
 
-AI-powered location intelligence and government scheme matching for businesses in India.
+> **Built for the GoogleX Hackathon** in collaboration with **DeepStation**
 
-## Overview
+An AI-powered multi-agent platform that helps investors and entrepreneurs identify the **best industrial parks** across India by combining real-time web scraping, Google Maps intelligence, government scheme matching, and Gemini AI deep research — all in a single unified pipeline.
 
-This tool helps entrepreneurs and investors identify the best Indian states to set up their business by:
-- Ranking states using weighted multi-criteria scoring
-- Matching applicable central and state government schemes
-- Estimating subsidy values
-- Providing AI-powered Q&A via Google Gemini
+---
 
-## Tech Stack
+## 🏗️ Architecture
 
-- **Backend:** Python + Flask
-- **AI:** Google Gemini (`google-generativeai`)
-- **Maps:** Google Maps JavaScript API
-- **Data:** Static JSON datasets (`data/`)
+```mermaid
+flowchart LR
+    A["👤 User Input<br/>Sector · State ·<br/>Land · Budget"] --> B["Step 2<br/>Query Engine<br/>Filter 4200+ parks"]
+    B --> C["🤖 Scraper Agent<br/>Geocode · Logistics<br/>· Gemini Research"]
+    C --> D["💾 MongoDB<br/>Store Enriched Data"]
+    D --> E["🤖 Ranking Agent<br/>Score (100pts) ·<br/>Deep AI Research"]
+    E --> F["🤖 Scheme Agent<br/>Gemini + Google Search<br/>Central + State Schemes"]
+    F --> G["📊 Top 10 Results<br/>Score · Breakdown ·<br/>AI Recommendation"]
+    G --> H["📄 PDF / Excel Export<br/>+ ROI Calculator"]
 
-## Setup
-
-### 1. Clone the repo
-```bash
-git clone <your-repo-url>
-cd startup_india_advisor
+    style C fill:#3b82f6,color:#fff
+    style E fill:#3b82f6,color:#fff
+    style F fill:#3b82f6,color:#fff
+    style H fill:#ec4899,color:#fff
 ```
 
-### 2. Create a virtual environment
+### Agent Detail View
+
+```mermaid
+flowchart TD
+    subgraph SA["🤖 Scraper Agent"]
+        SA1["Google Maps Geocoding<br/>Find Place → Place Details"]
+        SA2["Google Maps Places<br/>Highway · Railway · Airport · Port"]
+        SA3["Gemini AI Research<br/>Water · Raw Materials · Incentives"]
+        SA1 --> SA2 --> SA3
+    end
+
+    subgraph RA["🤖 Ranking Agent"]
+        RA1["Multi-Criteria Scoring<br/>7 categories = 100 pts"]
+        RA2["Deep Research via Gemini<br/>Why suitable · Why attractive"]
+        RA1 --> RA2
+    end
+
+    subgraph SchA["🤖 Scheme Agent"]
+        SchA1["Gemini + Google Search Grounding"]
+        SchA2["Central & State Schemes"]
+        SchA3["Subsidy Stack Calculation"]
+        SchA1 --> SchA2 --> SchA3
+    end
+
+    subgraph POST["📊 Post-Pipeline"]
+        P1["Live AI Recommendations"]
+        P2["ROI Calculator"]
+        P3["PDF & Excel Export"]
+    end
+
+    SA --> RA --> SchA --> POST
+
+    style SA fill:#3b82f620,stroke:#3b82f6
+    style RA fill:#3b82f620,stroke:#3b82f6
+    style SchA fill:#3b82f620,stroke:#3b82f6
+    style POST fill:#ec489920,stroke:#ec4899
+```
+
+---
+
+## ✨ Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Multi-Agent Pipeline** | 3 specialized AI agents (Scraper, Ranking, Scheme) orchestrated via SSE streaming |
+| **4,200+ Industrial Parks** | Comprehensive dataset covering all Indian states and union territories |
+| **Precise Geocoding** | Google Maps Find Place → Place Details → Geocoding API pipeline |
+| **Multi-Criteria Scoring** | 7-category weighted scoring engine (Sector, Land, Logistics, Water, Incentives, Plug&Play, Raw Materials) |
+| **Deep AI Research** | Per-park Gemini analysis with unique insights and recommendations |
+| **Government Schemes** | Gemini + Google Search grounding for real, active central & state schemes |
+| **ROI Calculator** | AI-powered investment return projections (break-even, NPV, payback) |
+| **PDF/Excel Export** | Professional report generation with Gemini-crafted executive summaries |
+| **Live AI Recommendations** | Async per-card Gemini recommendations loaded after results render |
+| **Interactive Maps** | Color-coded pins (green/yellow/red by score) with Google Maps integration |
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| **Backend** | Python 3.11+ · Flask · SSE Streaming |
+| **AI Engine** | Google Gemini API (v1beta REST) · `google-genai` SDK |
+| **Maps & Location** | Google Maps Platform (Places, Geocoding, Distance Matrix, JS API) |
+| **Database** | MongoDB (with in-memory fallback) |
+| **Report Generation** | ReportLab (PDF) · openpyxl (Excel) |
+| **Frontend** | Vanilla HTML/CSS/JS · Google Maps JavaScript API |
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Python 3.11+
+- Google API Key ([AI Studio](https://aistudio.google.com/app/apikey))
+- Google Maps API Key ([Cloud Console](https://console.cloud.google.com))
+- MongoDB (optional — in-memory cache used as fallback)
+
+### Installation
+
 ```bash
+# Clone the repository
+git clone https://github.com/mandeepsinh-parmar/GoogleX_Hackathon.git
+cd GoogleX_Hackathon
+
+# Create virtual environment
 python -m venv .venv
-# Windows
-.venv\Scripts\activate
-# macOS/Linux
-source .venv/bin/activate
-```
 
-### 3. Install dependencies
-```bash
+# Activate it
+# Windows:
+.venv\Scripts\activate
+# macOS/Linux:
+source .venv/bin/activate
+
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-### 4. Configure API Keys
-Copy the example environment file and fill in your keys:
+### Configuration
+
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env`:
-```
-GOOGLE_API_KEY=your_gemini_api_key_from_aistudio.google.com
-GOOGLE_MAPS_API_KEY=your_maps_key_from_cloud.google.com
+Edit `.env` with your API keys:
+```env
+GOOGLE_API_KEY=your_gemini_api_key
+GOOGLE_MAPS_API_KEY=your_maps_api_key
 ```
 
-> ⚠️ **Never commit your `.env` file.** It is already in `.gitignore`.
+> ⚠️ **Google Maps API** requires these APIs enabled in Cloud Console:
+> - Places API (New)
+> - Geocoding API
+> - Distance Matrix API
+> - Maps JavaScript API
 
-### 5. Run the app
+### Run
+
 ```bash
 python app.py
 ```
 
 Open [http://localhost:5000](http://localhost:5000) in your browser.
 
-## API Endpoints
+---
+
+## 📁 Project Structure
+
+```
+GoogleX_Hackathon/
+├── app.py                      # Flask backend — SSE pipeline orchestrator
+├── requirements.txt            # Python dependencies
+├── .env.example                # Environment variable template
+│
+├── agents/
+│   ├── scraper_agent.py        # 🤖 Agent 1: Geocoding + Logistics + Gemini Research
+│   ├── ranking_agent.py        # 🤖 Agent 2: Multi-criteria scoring + Deep Research
+│   └── scheme_agent.py         # 🤖 Agent 3: Government scheme matching via Gemini
+│
+├── tools/
+│   ├── location_tools.py       # Park query engine (4200+ parks) + geocoding
+│   ├── scheme_tools.py         # Scheme matching + subsidy estimation
+│   ├── scoring_tools.py        # Weighted location scoring + state ranking
+│   └── export_tools.py         # PDF (ReportLab) + Excel (openpyxl) generation
+│
+├── db/
+│   └── mongo_client.py         # MongoDB client with session management
+│
+├── data/
+│   └── iilb_parks.json         # Dataset: 4,200+ industrial parks across India
+│
+├── templates/
+│   └── index.html              # Frontend: Wizard UI + Google Maps + Results
+│
+└── docs/
+    └── ARCHITECTURE.md         # Detailed architecture documentation
+```
+
+---
+
+## 🔌 API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/` | Main UI |
-| POST | `/api/rank-states` | Rank all states for a business profile |
-| POST | `/api/schemes` | Match government schemes |
-| POST | `/api/parks` | Search industrial parks |
-| POST | `/api/subsidy` | Estimate subsidy value |
-| POST | `/api/chat` | AI Q&A via Gemini |
-| GET | `/api/health` | Health check |
+| `GET` | `/` | Main application UI |
+| `POST` | `/api/find-parks` | Step 2: Filter parks by sector, state, land |
+| `POST` | `/api/run-pipeline` | Steps 3–7: Full SSE pipeline (scrape → rank → schemes) |
+| `GET` | `/api/results/<id>` | Fetch stored results by session ID |
+| `POST` | `/api/ai-recommendation` | Generate unique AI recommendation for a park |
+| `POST` | `/api/roi-calculator` | AI-powered ROI calculation for a park |
+| `POST` | `/api/export/pdf` | Download professional PDF report |
+| `POST` | `/api/export/excel` | Download Excel data export |
+| `POST` | `/api/chat` | Direct Gemini Q&A |
+| `GET` | `/api/health` | Health check |
 
-## Project Structure
+---
+
+## 🔄 Pipeline Flow
 
 ```
-startup_india_advisor/
-├── app.py                  # Flask application
-├── requirements.txt        # Python dependencies
-├── .env.example            # Environment variable template
-├── .gitignore              # Git ignore rules
-├── data/
-│   ├── state_scores.json   # State infrastructure metrics
-│   ├── schemes.json        # Government scheme database
-│   └── industrial_parks.json
-├── tools/
-│   ├── location_tools.py   # Location intelligence
-│   ├── scheme_tools.py     # Scheme matching
-│   └── scoring_tools.py    # Weighted scoring engine
-└── templates/
-    └── index.html          # Frontend UI
+User Input → Query 4,200+ Parks → Scraper Agent (Geocode + Logistics + Research)
+    → MongoDB Storage → Ranking Agent (Score + Deep Research)
+    → Scheme Agent (Central + State Schemes) → Top 10 Results
+    → [Async] AI Recommendations → [On-Demand] ROI Calculator → [On-Demand] PDF/Excel Export
 ```
 
-## License
+### Scoring Breakdown (100 points)
 
-MIT
+| Category | Max Points | How It's Scored |
+|----------|-----------|-----------------|
+| Sector Match | 20 | Exact match vs. mixed-use |
+| Available Land | 20 | Meets or exceeds requirement |
+| Logistics | 20 | Highway + Railway + Airport + Port distances |
+| Water Supply | 10 | Availability assessment |
+| Incentives | 15 | Number and relevance of park incentives |
+| Plug & Play | 5 | Ready-to-move infrastructure |
+| Raw Materials | 10 | Regional availability |
+
+---
+
+## 🤝 Team
+
+Built with ❤️ for the **GoogleX Hackathon** in collaboration with **DeepStation**.
+
+---
+
+## 📄 License
+
+MIT License — see [LICENSE](LICENSE) for details.

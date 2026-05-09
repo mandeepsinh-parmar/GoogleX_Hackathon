@@ -68,3 +68,14 @@ htmlcov/
 # ==========================
 .DS_Store
 Desktop.ini
+
+# ==========================
+# Generated / Scratch
+# ==========================
+generator_output.txt
+server_log.txt
+*.txt
+!requirements.txt
+test_*.py
+run_test_server.py
+PROJECT_CONTEXT.md
