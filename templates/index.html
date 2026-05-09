@@ -830,11 +830,11 @@
                     </div>
                     ` : ''}
 
-                    <div class="ai-summary">
+                    <div class="ai-summary" id="ai-rec-${index}">
                         <div class="ai-summary-title">
                             ✨ AI Recommendation
                         </div>
-                        ${r.summary_paragraph || 'Strong candidate matching your criteria.'}
+                        <span style="color: var(--text-muted); font-style: italic;">⏳ Generating unique recommendation...</span>
                     </div>
                     
                     <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
@@ -844,6 +844,27 @@
                 `;
 
                 list.appendChild(card);
+
+                // ── Async AI Recommendation fetch ──────────────────────────
+                (async (parkData, idx) => {
+                    try {
+                        const resp = await fetch('/api/ai-recommendation', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(parkData)
+                        });
+                        const result = await resp.json();
+                        const el = document.getElementById(`ai-rec-${idx}`);
+                        if (el && result.recommendation) {
+                            el.innerHTML = `
+                                <div class="ai-summary-title">✨ AI Recommendation</div>
+                                ${result.recommendation}
+                            `;
+                        }
+                    } catch (err) {
+                        console.warn('AI recommendation fetch failed for park', idx, err);
+                    }
+                })(park, index);
             });
 
             if (!bounds.isEmpty()) {

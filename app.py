@@ -470,6 +470,81 @@ def export_excel():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@app.route('/api/ai-recommendation', methods=['POST'])
+def ai_recommendation():
+    """Generate a unique AI recommendation for a single park via Gemini REST API."""
+    import requests as http_requests
+
+    data = request.json or {}
+    park_name  = data.get("name", "Industrial Park")
+    district   = data.get("district", "")
+    state      = data.get("state", "")
+    sector     = data.get("sector", "")
+    area       = data.get("available_area_acres", 0)
+    hw         = data.get("nearest_highway_km", "N/A")
+    air        = data.get("nearest_airport_km", "N/A")
+    raw_mats   = data.get("raw_materials_nearby", [])
+    incentives = data.get("incentives", [])
+    schemes    = data.get("schemes", {})
+    research   = data.get("research", {})
+
+    prompt = (
+        f"You are an industrial investment advisor. Write a concise 2-3 sentence recommendation "
+        f"for why an industry in the {sector} sector should consider setting up at {park_name} "
+        f"in {district}, {state}. "
+        f"The park has {area} acres available, highway at {hw} km, airport at {air} km. "
+        f"Raw materials nearby: {', '.join(raw_mats) if raw_mats else 'various'}. "
+        f"Key incentives: {', '.join(incentives[:3]) if incentives else 'standard govt schemes'}. "
+        f"Estimated subsidy stack: Rs. {schemes.get('total_subsidy_cr', 0)} Crore. "
+        f"Focus on what makes THIS park uniquely attractive vs. alternatives. "
+        f"Write plain text, no markdown, no bullet points, no asterisks."
+    )
+
+    api_key = os.getenv("GOOGLE_API_KEY", "")
+    _MODELS = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.0-pro"]
+    ai_text = None
+    last_error = None
+
+    for model_name in _MODELS:
+        url = (
+            f"https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{model_name}:generateContent?key={api_key}"
+        )
+        try:
+            payload = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"temperature": 0.5, "maxOutputTokens": 200}
+            }
+            resp = http_requests.post(
+                url, json=payload,
+                headers={"Content-Type": "application/json"},
+                timeout=15
+            )
+            resp_data = resp.json()
+            if resp.status_code == 200 and "candidates" in resp_data:
+                ai_text = resp_data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                break
+            else:
+                last_error = resp_data.get("error", {}).get("message", "Unknown")
+        except Exception as exc:
+            last_error = str(exc)
+
+    if ai_text:
+        return jsonify({"status": "ok", "recommendation": ai_text})
+
+    # Data-driven fallback
+    fallback = (
+        f"{park_name} in {district}, {state} offers {area} acres with highway access at {hw} km "
+        f"and airport proximity at {air} km. "
+    )
+    if raw_mats:
+        fallback += f"Key raw materials ({', '.join(raw_mats[:3])}) are locally available, reducing logistics costs. "
+    if incentives:
+        fallback += f"Incentives include {', '.join(incentives[:2])}. "
+    fallback += f"A strong candidate for {sector} sector investment."
+
+    return jsonify({"status": "ok", "recommendation": fallback})
+
 # ═══════════════════════════════════════════════════════════════════════════
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)
