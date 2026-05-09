@@ -657,29 +657,37 @@
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
+                let buffer = '';
 
                 while (true) {
                     const {value, done} = await reader.read();
                     if (done) break;
                     
-                    const chunk = decoder.decode(value);
-                    const lines = chunk.split('\n');
+                    buffer += decoder.decode(value, {stream: true});
+                    const lines = buffer.split('\n');
+                    // The last line might be incomplete, so pop it and keep it in the buffer
+                    buffer = lines.pop();
                     
                     for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            const data = JSON.parse(line.substring(6));
-                            
-                            let stepName = "";
-                            if (data.step === 3) stepName = "Agent Scraping";
-                            if (data.step === 4) stepName = "Saving Data";
-                            if (data.step === 5) stepName = "AI Ranking & Research";
-                            if (data.step === 6) stepName = "Scheme Matching";
-                            if (data.step === 7) stepName = "Finalizing";
+                        const trimmedLine = line.trim();
+                        if (trimmedLine.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(trimmedLine.substring(6));
+                                
+                                let stepName = "";
+                                if (data.step === 3) stepName = "Agent Scraping";
+                                if (data.step === 4) stepName = "Saving Data";
+                                if (data.step === 5) stepName = "AI Ranking & Research";
+                                if (data.step === 6) stepName = "Scheme Matching";
+                                if (data.step === 7) stepName = "Finalizing";
 
-                            updateProgress(stepName, data.msg, data.pct);
+                                updateProgress(stepName, data.msg, data.pct);
 
-                            if (data.step === 7 && data.results) {
-                                renderResults(data.results);
+                                if (data.step === 7 && data.results) {
+                                    renderResults(data.results);
+                                }
+                            } catch (e) {
+                                console.warn("Incomplete or malformed JSON chunk skipped:", e.message);
                             }
                         }
                     }
