@@ -98,56 +98,63 @@ flowchart TD
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.11+ or Docker
 - Google API Key ([AI Studio](https://aistudio.google.com/app/apikey))
 - Google Maps API Key ([Cloud Console](https://console.cloud.google.com))
-- MongoDB (optional — in-memory cache used as fallback)
 
-### Installation
+> ⚠️ **Google Maps API** requires these APIs enabled in Cloud Console:
+> - Places API (New), Geocoding API, Distance Matrix API, Maps JavaScript API
+
+### Option A: Run Locally (Python)
 
 ```bash
 # Clone the repository
 git clone https://github.com/mandeepsinh-parmar/GoogleX_Hackathon.git
 cd GoogleX_Hackathon
 
-# Create virtual environment
+# Set up environment
 python -m venv .venv
-
-# Activate it
-# Windows:
-.venv\Scripts\activate
-# macOS/Linux:
-source .venv/bin/activate
-
-# Install dependencies
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-```
 
-### Configuration
-
-```bash
+# Configure keys
 cp .env.example .env
-```
+# Edit .env with your Google API keys
 
-Edit `.env` with your API keys:
-```env
-GOOGLE_API_KEY=your_gemini_api_key
-GOOGLE_MAPS_API_KEY=your_maps_api_key
-```
-
-> ⚠️ **Google Maps API** requires these APIs enabled in Cloud Console:
-> - Places API (New)
-> - Geocoding API
-> - Distance Matrix API
-> - Maps JavaScript API
-
-### Run
-
-```bash
+# Run the app
 python app.py
 ```
+Open [http://localhost:5000](http://localhost:5000)
 
-Open [http://localhost:5000](http://localhost:5000) in your browser.
+### Option B: Run Locally (Docker)
+
+```bash
+docker build -t industrial-finder .
+docker run -p 8080:8080 --env-file .env industrial-finder
+```
+Open [http://localhost:8080](http://localhost:8080)
+
+---
+
+## ☁️ Deployment (Google Cloud Run)
+
+The application is containerized and ready for serverless deployment on Google Cloud Run.
+
+```bash
+# 1. Install Google Cloud CLI and authenticate
+gcloud auth login
+gcloud config set project YOUR_PROJECT_ID
+
+# 2. Deploy directly from source
+gcloud run deploy startupadvisor \
+  --source . \
+  --region asia-south1 \
+  --allow-unauthenticated \
+  --memory 512Mi \
+  --set-env-vars "GOOGLE_API_KEY=YOUR_GEMINI_KEY,GOOGLE_MAPS_API_KEY=YOUR_MAPS_KEY"
+```
+
+For detailed deployment instructions, see [DEPLOY.md](DEPLOY.md).
 
 ---
 
